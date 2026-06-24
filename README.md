@@ -29,7 +29,13 @@ This project implements a lightweight local workaround:
 ```text
 .
 ├── build.sh
+├── disable.sh
+├── enable.sh
 ├── install.sh
+├── lib
+│   └── common.sh
+├── status.sh
+├── toggle.sh
 ├── uninstall.sh
 └── src
     └── main.m
@@ -79,6 +85,39 @@ The installer:
 - installs it to `~/Library/Application Support/MacDisplay/MacDisplayAgent`
 - installs a LaunchAgent at `~/Library/LaunchAgents/com.felix021.macdisplay.plist`
 - removes the earlier `com.codex.internaldisplayautodim` label if it exists
+
+## Lightweight on/off controls
+
+After installation, you do not need to uninstall the project to temporarily stop it.
+
+Enable the agent:
+
+```bash
+bash enable.sh
+```
+
+Disable the agent:
+
+```bash
+bash disable.sh
+```
+
+Toggle it:
+
+```bash
+bash toggle.sh
+```
+
+Check current status:
+
+```bash
+bash status.sh
+```
+
+Notes:
+
+- `disable.sh` restores the built-in display brightness once, then unloads the `LaunchAgent`
+- `enable.sh` loads the existing `LaunchAgent` again without reinstalling files
 
 ## Uninstall
 
