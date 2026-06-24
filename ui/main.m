@@ -168,6 +168,86 @@
 }
 @end
 
+typedef NS_ENUM(NSInteger, MacDisplayLogoState) {
+    MacDisplayLogoStateEnabled,
+    MacDisplayLogoStateDisabled,
+    MacDisplayLogoStateBusy,
+    MacDisplayLogoStateMissing,
+};
+
+static void DrawRoundedRect(NSRect rect, CGFloat radius) {
+    [[NSBezierPath bezierPathWithRoundedRect:rect xRadius:radius yRadius:radius] fill];
+}
+
+static void StrokeRoundedRect(NSRect rect, CGFloat radius, CGFloat lineWidth) {
+    NSBezierPath *path = [NSBezierPath bezierPathWithRoundedRect:rect xRadius:radius yRadius:radius];
+    path.lineWidth = lineWidth;
+    [path stroke];
+}
+
+static void DrawMacDisplayLogo(NSRect rect, MacDisplayLogoState state, BOOL appIcon) {
+    CGFloat scale = MIN(rect.size.width, rect.size.height) / 24.0;
+    NSRect box = NSMakeRect(rect.origin.x + (rect.size.width - 24.0 * scale) / 2.0,
+                           rect.origin.y + (rect.size.height - 24.0 * scale) / 2.0,
+                           24.0 * scale,
+                           24.0 * scale);
+
+    NSColor *strokeColor = appIcon ? [NSColor colorWithCalibratedWhite:0.10 alpha:1.0] : [NSColor labelColor];
+    NSColor *monitorFill = appIcon ? [NSColor colorWithCalibratedWhite:0.94 alpha:1.0] : [NSColor colorWithCalibratedWhite:0.92 alpha:0.95];
+    NSColor *monitorInset = appIcon ? [NSColor colorWithCalibratedWhite:0.18 alpha:1.0] : [NSColor colorWithCalibratedWhite:0.18 alpha:0.9];
+    NSColor *macBody = appIcon ? [NSColor colorWithCalibratedWhite:0.78 alpha:1.0] : [NSColor colorWithCalibratedWhite:0.70 alpha:0.95];
+    NSColor *macScreen = [NSColor colorWithCalibratedWhite:0.18 alpha:1.0];
+
+    if (state == MacDisplayLogoStateEnabled) {
+        macScreen = appIcon ? [NSColor colorWithCalibratedRed:0.46 green:0.83 blue:1.00 alpha:1.0]
+                            : [NSColor colorWithCalibratedRed:0.34 green:0.78 blue:1.00 alpha:1.0];
+    } else if (state == MacDisplayLogoStateBusy) {
+        macScreen = [NSColor colorWithCalibratedRed:1.00 green:0.72 blue:0.28 alpha:1.0];
+    } else if (state == MacDisplayLogoStateMissing) {
+        macScreen = [NSColor colorWithCalibratedWhite:0.45 alpha:1.0];
+    }
+
+    if (appIcon) {
+        NSGradient *background = [[NSGradient alloc] initWithStartingColor:[NSColor colorWithCalibratedRed:0.09 green:0.13 blue:0.18 alpha:1.0]
+                                                               endingColor:[NSColor colorWithCalibratedRed:0.24 green:0.31 blue:0.38 alpha:1.0]];
+        [background drawInBezierPath:[NSBezierPath bezierPathWithRoundedRect:rect xRadius:rect.size.width * 0.22 yRadius:rect.size.height * 0.22] angle:90.0];
+        strokeColor = [NSColor colorWithCalibratedWhite:0.06 alpha:1.0];
+    }
+
+    CGFloat lineWidth = MAX(1.0, 1.45 * scale);
+
+    NSRect macScreenRect = NSMakeRect(box.origin.x + 2.0 * scale, box.origin.y + 7.2 * scale, 10.8 * scale, 8.8 * scale);
+    NSRect macBaseRect = NSMakeRect(box.origin.x + 1.2 * scale, box.origin.y + 5.1 * scale, 12.5 * scale, 2.1 * scale);
+    NSRect monitorRect = NSMakeRect(box.origin.x + 6.3 * scale, box.origin.y + 4.1 * scale, 15.4 * scale, 13.8 * scale);
+    NSRect monitorScreen = NSInsetRect(monitorRect, 2.1 * scale, 2.1 * scale);
+    NSRect standRect = NSMakeRect(box.origin.x + 12.7 * scale, box.origin.y + 2.5 * scale, 2.6 * scale, 2.2 * scale);
+    NSRect footRect = NSMakeRect(box.origin.x + 10.0 * scale, box.origin.y + 1.7 * scale, 8.1 * scale, 1.6 * scale);
+
+    [macBody setFill];
+    DrawRoundedRect(macBaseRect, 0.8 * scale);
+    [strokeColor setStroke];
+    StrokeRoundedRect(macBaseRect, 0.8 * scale, lineWidth * 0.65);
+
+    [macScreen setFill];
+    DrawRoundedRect(macScreenRect, 1.6 * scale);
+    [strokeColor setStroke];
+    StrokeRoundedRect(macScreenRect, 1.6 * scale, lineWidth);
+
+    [monitorFill setFill];
+    DrawRoundedRect(monitorRect, 2.2 * scale);
+    [strokeColor setStroke];
+    StrokeRoundedRect(monitorRect, 2.2 * scale, lineWidth);
+
+    [monitorInset setFill];
+    DrawRoundedRect(monitorScreen, 1.1 * scale);
+
+    [macBody setFill];
+    DrawRoundedRect(standRect, 0.5 * scale);
+    DrawRoundedRect(footRect, 0.8 * scale);
+    [strokeColor setStroke];
+    StrokeRoundedRect(footRect, 0.8 * scale, lineWidth * 0.65);
+}
+
 @interface AppDelegate : NSObject <NSApplicationDelegate, NSMenuDelegate>
 @property (nonatomic, strong) AgentController *controller;
 @property (nonatomic, strong) NSStatusItem *statusItem;
@@ -229,45 +309,35 @@
 }
 
 - (NSImage *)statusImageForState:(NSString *)state {
-    NSArray<NSString *> *symbolNames = nil;
-    NSString *fallbackTitle = @"MD";
     NSString *description = @"Mac Display Control";
+    NSString *resourceName = @"MacDisplayTrayDisabled";
 
     if ([state isEqualToString:@"enabled"]) {
-        symbolNames = @[@"display.2", @"rectangle.on.rectangle"];
-        fallbackTitle = @"MD";
+        resourceName = @"MacDisplayTrayEnabled";
         description = @"Mac Display Control enabled";
     } else if ([state isEqualToString:@"disabled"]) {
-        symbolNames = @[@"display", @"rectangle"];
-        fallbackTitle = @"M";
+        resourceName = @"MacDisplayTrayDisabled";
         description = @"Mac Display Control disabled";
     } else if ([state isEqualToString:@"busy"]) {
-        symbolNames = @[@"ellipsis.circle", @"hourglass.circle"];
-        fallbackTitle = @"...";
+        resourceName = @"MacDisplayTrayEnabled";
         description = self.busyMessage ?: @"Mac Display Control working";
     } else if ([state isEqualToString:@"missing"]) {
-        symbolNames = @[@"questionmark.circle", @"exclamationmark.circle"];
-        fallbackTitle = @"?";
+        resourceName = @"MacDisplayTrayDisabled";
         description = @"Mac Display Control not installed";
-    } else {
-        symbolNames = @[@"display", @"rectangle"];
     }
 
-    if (@available(macOS 11.0, *)) {
-        NSImageSymbolConfiguration *configuration = [NSImageSymbolConfiguration configurationWithPointSize:15 weight:NSFontWeightSemibold];
-        for (NSString *symbolName in symbolNames) {
-            NSImage *image = [NSImage imageWithSystemSymbolName:symbolName accessibilityDescription:description];
-            if (image != nil) {
-                image = [image imageWithSymbolConfiguration:configuration];
-                image.template = YES;
-                self.statusItem.button.title = @"";
-                return image;
-            }
-        }
+    NSString *imagePath = [[NSBundle mainBundle] pathForResource:resourceName ofType:@"png"];
+    NSImage *image = imagePath != nil ? [[NSImage alloc] initWithContentsOfFile:imagePath] : nil;
+    if (image == nil) {
+        self.statusItem.button.title = @"MD";
+        return nil;
     }
 
-    self.statusItem.button.title = fallbackTitle;
-    return nil;
+    image.size = NSMakeSize(22.0, 22.0);
+    [image setAccessibilityDescription:description];
+    image.template = NO;
+    self.statusItem.button.title = @"";
+    return image;
 }
 
 - (void)updateStatusIconForState:(NSString *)state {

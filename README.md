@@ -107,6 +107,12 @@ The menu bar app lets you:
 - restore built-in brightness
 - open the agent log
 
+The menu bar icon uses MacBook-only transparent PNG assets in `assets/MacDisplayTrayEnabled.png` and `assets/MacDisplayTrayDisabled.png`.
+
+When auto dimming is enabled, the tray icon shows only a MacBook with its screen off. When auto dimming is disabled, it shows only a MacBook with its screen on.
+
+The app icon keeps the external-monitor composition from `assets/MacDisplayEnabled.png` and is generated during `build-ui.sh`.
+
 It does not replace the agent. It is just a friendly controller for the already-installed background behavior.
 
 ## Lightweight on/off controls
