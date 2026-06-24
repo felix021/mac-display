@@ -175,6 +175,8 @@
 @property (nonatomic, strong) NSMenuItem *enableItem;
 @property (nonatomic, strong) NSMenuItem *disableItem;
 @property (nonatomic, strong) NSMenuItem *restoreItem;
+@property (nonatomic, assign) BOOL busy;
+@property (nonatomic, copy) NSString *busyMessage;
 @end
 
 @implementation AppDelegate
@@ -184,9 +186,8 @@
     [NSApp setActivationPolicy:NSApplicationActivationPolicyAccessory];
     self.controller = [[AgentController alloc] init];
 
-    self.statusItem = [[NSStatusBar systemStatusBar] statusItemWithLength:NSVariableStatusItemLength];
-    self.statusItem.button.title = @"MD";
-    self.statusItem.button.toolTip = @"Mac Display Control";
+    self.statusItem = [[NSStatusBar systemStatusBar] statusItemWithLength:NSSquareStatusItemLength];
+    [self updateStatusIconForState:@"initial"];
 
     NSMenu *menu = [[NSMenu alloc] initWithTitle:@"Mac Display"];
     menu.delegate = self;
@@ -227,7 +228,72 @@
     [self refreshMenuState];
 }
 
+- (NSImage *)statusImageForState:(NSString *)state {
+    NSArray<NSString *> *symbolNames = nil;
+    NSString *fallbackTitle = @"MD";
+    NSString *description = @"Mac Display Control";
+
+    if ([state isEqualToString:@"enabled"]) {
+        symbolNames = @[@"display.2", @"rectangle.on.rectangle"];
+        fallbackTitle = @"MD";
+        description = @"Mac Display Control enabled";
+    } else if ([state isEqualToString:@"disabled"]) {
+        symbolNames = @[@"display", @"rectangle"];
+        fallbackTitle = @"M";
+        description = @"Mac Display Control disabled";
+    } else if ([state isEqualToString:@"busy"]) {
+        symbolNames = @[@"ellipsis.circle", @"hourglass.circle"];
+        fallbackTitle = @"...";
+        description = self.busyMessage ?: @"Mac Display Control working";
+    } else if ([state isEqualToString:@"missing"]) {
+        symbolNames = @[@"questionmark.circle", @"exclamationmark.circle"];
+        fallbackTitle = @"?";
+        description = @"Mac Display Control not installed";
+    } else {
+        symbolNames = @[@"display", @"rectangle"];
+    }
+
+    if (@available(macOS 11.0, *)) {
+        NSImageSymbolConfiguration *configuration = [NSImageSymbolConfiguration configurationWithPointSize:15 weight:NSFontWeightSemibold];
+        for (NSString *symbolName in symbolNames) {
+            NSImage *image = [NSImage imageWithSystemSymbolName:symbolName accessibilityDescription:description];
+            if (image != nil) {
+                image = [image imageWithSymbolConfiguration:configuration];
+                image.template = YES;
+                self.statusItem.button.title = @"";
+                return image;
+            }
+        }
+    }
+
+    self.statusItem.button.title = fallbackTitle;
+    return nil;
+}
+
+- (void)updateStatusIconForState:(NSString *)state {
+    NSStatusBarButton *button = self.statusItem.button;
+    if (button == nil) {
+        return;
+    }
+
+    NSImage *image = [self statusImageForState:state];
+    button.image = image;
+    if (image == nil && button.title.length == 0) {
+        button.title = @"MD";
+    }
+}
+
 - (void)refreshMenuState {
+    if (self.busy) {
+        self.statusItemLabel.title = self.busyMessage ?: @"Working...";
+        self.enableItem.enabled = NO;
+        self.disableItem.enabled = NO;
+        self.restoreItem.enabled = NO;
+        self.statusItem.button.toolTip = self.busyMessage ?: @"Mac Display Control is working";
+        [self updateStatusIconForState:@"busy"];
+        return;
+    }
+
     BOOL installed = [self.controller isInstalled];
     BOOL enabled = installed && [self.controller isEnabled];
 
@@ -236,8 +302,8 @@
         self.enableItem.enabled = NO;
         self.disableItem.enabled = NO;
         self.restoreItem.enabled = NO;
-        self.statusItem.button.title = @"MD?";
         self.statusItem.button.toolTip = @"Mac Display Control: agent not installed";
+        [self updateStatusIconForState:@"missing"];
         return;
     }
 
@@ -245,8 +311,8 @@
     self.enableItem.enabled = !enabled;
     self.disableItem.enabled = enabled;
     self.restoreItem.enabled = YES;
-    self.statusItem.button.title = enabled ? @"MD" : @"MD Off";
     self.statusItem.button.toolTip = enabled ? @"Mac Display Control: enabled" : @"Mac Display Control: disabled";
+    [self updateStatusIconForState:enabled ? @"enabled" : @"disabled"];
 }
 
 - (void)presentError:(NSError *)error {
@@ -262,31 +328,49 @@
     [alert runModal];
 }
 
+- (void)runAsyncActionWithBusyMessage:(NSString *)busyMessage block:(BOOL (^)(NSError **error))block {
+    if (self.busy) {
+        return;
+    }
+
+    self.busy = YES;
+    self.busyMessage = busyMessage;
+    [self refreshMenuState];
+
+    dispatch_async(dispatch_get_global_queue(QOS_CLASS_USER_INITIATED, 0), ^{
+        NSError *error = nil;
+        BOOL success = block(&error);
+
+        dispatch_async(dispatch_get_main_queue(), ^{
+            self.busy = NO;
+            self.busyMessage = nil;
+            [self refreshMenuState];
+            if (!success) {
+                [self presentError:error];
+            }
+        });
+    });
+}
+
 - (void)enableAgent:(id)sender {
     (void)sender;
-    NSError *error = nil;
-    if (![self.controller enable:&error]) {
-        [self presentError:error];
-    }
-    [self refreshMenuState];
+    [self runAsyncActionWithBusyMessage:@"Enabling auto dimming..." block:^BOOL(NSError **error) {
+        return [self.controller enable:error];
+    }];
 }
 
 - (void)disableAgent:(id)sender {
     (void)sender;
-    NSError *error = nil;
-    if (![self.controller disable:&error]) {
-        [self presentError:error];
-    }
-    [self refreshMenuState];
+    [self runAsyncActionWithBusyMessage:@"Disabling auto dimming..." block:^BOOL(NSError **error) {
+        return [self.controller disable:error];
+    }];
 }
 
 - (void)restoreBrightness:(id)sender {
     (void)sender;
-    NSError *error = nil;
-    if (![self.controller restoreBrightness:&error]) {
-        [self presentError:error];
-    }
-    [self refreshMenuState];
+    [self runAsyncActionWithBusyMessage:@"Restoring built-in brightness..." block:^BOOL(NSError **error) {
+        return [self.controller restoreBrightness:error];
+    }];
 }
 
 - (void)openLog:(id)sender {
