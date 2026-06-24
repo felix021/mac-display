@@ -122,7 +122,7 @@
         return NO;
     }
 
-    return [self runTask:@"/bin/launchctl" arguments:@[@"kickstart", @"-k", [self guiDomainTarget]] captureOutput:nil error:error];
+    return YES;
 }
 
 - (BOOL)disable:(NSError **)error {

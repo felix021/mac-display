@@ -12,6 +12,5 @@ if is_enabled; then
 fi
 
 launchctl bootstrap "gui/$UID" "$PLIST_PATH"
-launchctl kickstart -k "gui/$UID/$LABEL"
 
 echo "Enabled $LABEL"

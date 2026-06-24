@@ -52,7 +52,6 @@ launchctl bootout "gui/$UID" "$LEGACY_PLIST_PATH" >/dev/null 2>&1 || true
 rm -f "$LEGACY_PLIST_PATH"
 launchctl bootout "gui/$UID" "$PLIST_PATH" >/dev/null 2>&1 || true
 launchctl bootstrap "gui/$UID" "$PLIST_PATH"
-launchctl kickstart -k "gui/$UID/$LABEL"
 
 echo "Installed $LABEL"
 echo "Binary: $INSTALLED_BINARY"
