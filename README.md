@@ -1,6 +1,6 @@
 # mac-display
 
-`mac-display` is a small native macOS agent for MacBook users who work with an external monitor and want the built-in panel to go black automatically.
+`mac-display` is a small native macOS tool for MacBook users who work with an external monitor but still want to keep the lid open and the built-in panel dark.
 
 When at least one external display is connected, the agent:
 
@@ -12,11 +12,14 @@ When at least one external display is connected, the agent:
 
 macOS does not provide a built-in way to automatically turn the internal panel dark when an external monitor is attached while keeping the lid open.
 
+A common reason for wanting this setup is convenience: keeping the lid open means `Touch ID`, the built-in keyboard, webcam, speakers, and microphone all remain easy to use, while the internal display stops being visually distracting.
+
 This project implements a lightweight local workaround:
 
 - watch display attach/detach events with `CGDisplayRegisterReconfigurationCallback`
 - control the built-in panel brightness through the private `DisplayServices` API
 - run as a user `LaunchAgent` at login
+- optionally expose a tiny menu bar UI for turning the behavior on or off
 
 ## Requirements
 
@@ -29,6 +32,7 @@ This project implements a lightweight local workaround:
 ```text
 .
 ├── build.sh
+├── build-ui.sh
 ├── disable.sh
 ├── enable.sh
 ├── install.sh
@@ -37,6 +41,8 @@ This project implements a lightweight local workaround:
 ├── status.sh
 ├── toggle.sh
 ├── uninstall.sh
+├── ui
+│   └── main.m
 └── src
     └── main.m
 ```
@@ -51,6 +57,7 @@ This produces:
 
 ```text
 build/MacDisplayAgent
+build/MacDisplayControl.app
 ```
 
 ## Run manually
@@ -82,9 +89,25 @@ bash install.sh
 The installer:
 
 - builds the binary
+- builds a tiny menu bar app
 - installs it to `~/Library/Application Support/MacDisplay/MacDisplayAgent`
+- installs `~/Applications/MacDisplayControl.app`
 - installs a LaunchAgent at `~/Library/LaunchAgents/com.felix021.macdisplay.plist`
 - removes the earlier `com.codex.internaldisplayautodim` label if it exists
+- opens the menu bar app once in the background
+
+## Lightweight UI
+
+After installation, open `~/Applications/MacDisplayControl.app` to get a small menu bar control.
+
+The menu bar app lets you:
+
+- enable auto dimming
+- disable auto dimming
+- restore built-in brightness
+- open the agent log
+
+It does not replace the agent. It is just a friendly controller for the already-installed background behavior.
 
 ## Lightweight on/off controls
 

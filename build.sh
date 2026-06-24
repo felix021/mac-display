@@ -16,4 +16,6 @@ clang \
   "$ROOT_DIR/src/main.m" \
   -o "$OUTPUT_BIN"
 
+bash "$ROOT_DIR/build-ui.sh" >/dev/null
+
 echo "$OUTPUT_BIN"
